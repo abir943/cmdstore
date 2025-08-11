@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoatStore - Paste Service</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; background-color: #f4f4f9; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; }
+        form { display: flex; flex-direction: column; gap: 10px; }
+        input, textarea, button { padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background-color: #007bff; color: white; cursor: pointer; border: none; font-size: 16px; }
+        button:hover { background-color: #0056b3; }
+        #posts-container { margin-top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .post { border: 1px solid #e0e0e0; padding: 15px; border-radius: 6px; background-color: #fafafa; }
+        .post-title { font-weight: bold; font-size: 1.2em; color: #333; }
+        .post-meta { font-size: 0.9em; color: #666; margin-top: 5px; }
+        .post-link a { color: #007bff; text-decoration: none; }
+        .post-link a:hover { text-decoration: underline; }
+        .code-snippet { background-color: #f1f1f1; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; }
+        .success-message { color: green; font-weight: bold; margin-top: 10px; }
+        .error-message { color: red; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>GoatStore - Paste Service</h1>
+        <p>Post and view your code snippets easily.</p>
+
+        <h2>Create a New Paste</h2>
+        <form id="paste-form">
+            <input type="text" id="itemName" placeholder="Paste Title (optional)">
+            <input type="text" id="authorName" placeholder="Author Name (optional)">
+            <textarea id="code" rows="10" placeholder="Paste your code here..." required></textarea>
+            <button type="submit">Submit Paste</button>
+        </form>
+        <div id="status-message"></div>
+
+        ---
+
+        <h2>All Pastes</h2>
+        <div id="posts-container">
+            <p>Loading posts...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = window.location.origin;
+
+        // Function to fetch and display posts
+        async function fetchPosts() {
+            const postsContainer = document.getElementById('posts-container');
+            postsContainer.innerHTML = '<p>Loading posts...</p>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/items`);
+                const { items } = await response.json();
+                
+                if (items.length === 0) {
+                    postsContainer.innerHTML = '<p>No pastes found.</p>';
+                    return;
+                }
+
+                postsContainer.innerHTML = '';
+                items.forEach(post => {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post';
+
+                    const rawLinkHtml = post.link ? `<div class="post-link">Raw link: <a href="${post.link}" target="_blank">${post.link}</a></div>` : '';
+                    
+                    postElement.innerHTML = `
+                        <div class="post-title">${post.itemName}</div>
+                        <div class="post-meta">by ${post.authorName} on ${new Date(post.createdAt).toLocaleDateString()}</div>
+                        ${rawLinkHtml}
+                    `;
+                    postsContainer.appendChild(postElement);
+                });
+            } catch (error) {
+                console.error('Error fetching posts:', error);
+                postsContainer.innerHTML = '<p class="error-message">Failed to load posts. Please check the server.</p>';
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('paste-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = 'Submitting...';
+
+            const itemName = document.getElementById('itemName').value || 'Untitled Paste';
+            const authorName = document.getElementById('authorName').value || 'Anonymous';
+            const code = document.getElementById('code').value;
+
+            const postData = { itemName, authorName, code };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/v1/paste`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(postData),
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    statusMessage.textContent = `Success! Your paste is at: ${result.link}`;
+                    statusMessage.className = 'success-message';
+                    fetchPosts();
+                    document.getElementById('paste-form').reset();
+                } else {
+                    statusMessage.textContent = `Error: ${result.error || response.statusText}`;
+                    statusMessage.className = 'error-message';
+                }
+            } catch (error) {
+                console.error('Error posting new paste:', error);
+                statusMessage.textContent = 'An unexpected error occurred.';
+                statusMessage.className = 'error-message';
+            }
+        });
+
+        // Initial fetch when the page loads
+        document.addEventListener('DOMContentLoaded', fetchPosts);
+    </script>
+</body>
+</html>
